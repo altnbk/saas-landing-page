@@ -1,6 +1,6 @@
 # Project Status
 
-## Current Milestone: M3 - GitHub Integration
+## Current Milestone: M4 - Cloudflare Pages Integration
 
 ## Completed
 
@@ -28,21 +28,29 @@
 - [x] Created deployment detail page with logs
 - [x] Ensured XSS protection via Astro auto-escaping
 
+### Milestone 3: GitHub Integration (✓)
+- [x] Added Octokit for GitHub API
+- [x] Created landing page HTML template
+- [x] Implemented template renderer with XSS protection
+- [x] Built GitHub service for repo creation
+- [x] Created API endpoint for GitHub trigger
+- [x] Updated dashboard to auto-trigger GitHub creation
+- [x] Added error handling and logging
+
 ## In Progress
 
-- [ ] M3: GitHub Integration
+- [ ] M4: Cloudflare Pages Integration
 
 ## Todo
 
-- [ ] M4: Cloudflare Pages Integration
 - [ ] M5: Background Worker + Status Polling
 - [ ] M6: Email Notifications
 
 ## Notes
 
-Milestone 2 complete! Users can now submit deployment forms and view their deployments.
-Database is properly secured with RLS.
-Starting M3: GitHub integration to create repos from templates.
+Milestone 3 complete! System now creates GitHub repositories with rendered landing pages.
+All user inputs are HTML-escaped to prevent XSS.
+Starting M4: Cloudflare Pages integration for automatic deployments.
 
 ## Last Updated
 

@@ -5,6 +5,7 @@
 import type { APIRoute } from 'astro';
 import { getSupabaseClient, getSupabaseAdmin } from '../../../../lib/supabase';
 import { createLandingPageRepo } from '../../../../lib/github';
+import { createPagesProject, getLatestDeployment } from '../../../../lib/cloudflare';
 
 export const POST: APIRoute = async ({ params, cookies, request }) => {
   const { id } = params;
@@ -111,11 +112,120 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
         })
         .eq('id', id);
 
+      // Step 2: Create Cloudflare Pages project
+      let pagesProject;
+      let pagesUrl;
+      try {
+        // Log: Starting Cloudflare Pages creation
+        await supabaseAdmin.from('deployment_logs').insert({
+          deployment_id: id,
+          level: 'info',
+          message: 'Creating Cloudflare Pages project',
+        });
+
+        pagesProject = await createPagesProject({
+          projectName: repoResult.repoName,
+          repoName: repoResult.repoName,
+          repoOwner: import.meta.env.GITHUB_TEMPLATE_OWNER,
+        });
+
+        pagesUrl = `https://${pagesProject.subdomain}.pages.dev`;
+
+        // Log: Pages project created
+        await supabaseAdmin.from('deployment_logs').insert({
+          deployment_id: id,
+          level: 'info',
+          message: `Cloudflare Pages project created: ${pagesProject.name}`,
+          metadata: { pages_url: pagesUrl },
+        });
+
+        // Update deployment with Pages info and set status to deploying
+        await supabaseAdmin
+          .from('deployments')
+          .update({
+            pages_url: pagesUrl,
+            status: 'deploying',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        // Wait a bit for initial deployment to start
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check for deployment
+        const latestDeployment = await getLatestDeployment(pagesProject.name);
+
+        if (latestDeployment) {
+          await supabaseAdmin.from('deployment_logs').insert({
+            deployment_id: id,
+            level: 'info',
+            message: `Deployment started. Status: ${latestDeployment.latest_stage.status}`,
+            metadata: { deployment_id: latestDeployment.id },
+          });
+
+          await supabaseAdmin
+            .from('deployments')
+            .update({
+              pages_deployment_id: latestDeployment.id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+          // Check if deployment is already complete
+          if (latestDeployment.latest_stage.status === 'success') {
+            await supabaseAdmin
+              .from('deployments')
+              .update({
+                status: 'live',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', id);
+
+            await supabaseAdmin.from('deployment_logs').insert({
+              deployment_id: id,
+              level: 'info',
+              message: 'Deployment completed successfully!',
+            });
+          }
+        }
+
+      } catch (cfError: any) {
+        // Log Cloudflare error
+        await supabaseAdmin.from('deployment_logs').insert({
+          deployment_id: id,
+          level: 'error',
+          message: `Failed to create Cloudflare Pages project: ${cfError.message}`,
+        });
+
+        // Update deployment status to failed
+        await supabaseAdmin
+          .from('deployments')
+          .update({
+            status: 'failed',
+            error_message: `Cloudflare error: ${cfError.message}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        return new Response(
+          JSON.stringify({
+            error: 'GitHub repository created but Cloudflare Pages setup failed',
+            details: cfError.message,
+            repoUrl: repoResult.htmlUrl
+          }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           repoUrl: repoResult.htmlUrl,
           repoName: repoResult.repoName,
+          pagesUrl: pagesUrl,
         }),
         {
           status: 200,
