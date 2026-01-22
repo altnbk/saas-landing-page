@@ -347,13 +347,34 @@ function getStatusColor(status: string) {
         if (error) throw error;
 
         messageDiv.className = 'form-message show success';
-        messageDiv.textContent = 'Deployment created successfully! Redirecting...';
+        messageDiv.textContent = 'Deployment created! Starting GitHub repo creation...';
         form.reset();
 
-        // Redirect to deployment detail page after 1.5 seconds
+        // Trigger GitHub repo creation
+        try {
+          const response = await fetch(`/api/deployments/${deployment.id}/trigger-github`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to trigger GitHub creation');
+          }
+
+          messageDiv.textContent = 'GitHub repository created! Redirecting...';
+        } catch (triggerError: any) {
+          console.error('GitHub trigger error:', triggerError);
+          messageDiv.className = 'form-message show error';
+          messageDiv.textContent = `Deployment created but GitHub creation failed: ${triggerError.message}`;
+        }
+
+        // Redirect to deployment detail page after 2 seconds
         setTimeout(() => {
           window.location.href = `/dashboard/deployments/${deployment.id}`;
-        }, 1500);
+        }, 2000);
       } catch (error: any) {
         messageDiv.className = 'form-message show error';
         messageDiv.textContent = error.message || 'Failed to create deployment. Please try again.';

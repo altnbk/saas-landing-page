@@ -1,6 +1,6 @@
 # Project Status
 
-## Current Milestone: M2 - DB Schema + RLS + Form Submission
+## Current Milestone: M3 - GitHub Integration
 
 ## Completed
 
@@ -17,21 +17,32 @@
 - [x] Added logout functionality
 - [x] Created .env.example with all required variables
 
+### Milestone 2: DB Schema + RLS + Form Submission (✓)
+- [x] Created SQL migrations (profiles, deployments, deployment_logs)
+- [x] Implemented Row Level Security policies
+- [x] Added auto-profile creation trigger
+- [x] Created shared types package
+- [x] Built deployment creation form
+- [x] Implemented form submission with validation
+- [x] Added deployment list view with status badges
+- [x] Created deployment detail page with logs
+- [x] Ensured XSS protection via Astro auto-escaping
+
 ## In Progress
 
-- [ ] M2: DB Schema + RLS + Form Submission
+- [ ] M3: GitHub Integration
 
 ## Todo
 
-- [ ] M3: GitHub Integration
 - [ ] M4: Cloudflare Pages Integration
 - [ ] M5: Background Worker + Status Polling
 - [ ] M6: Email Notifications
 
 ## Notes
 
-Milestone 1 complete! Users can now authenticate with magic links and access a protected dashboard.
-Starting M2: Database schema, RLS policies, and deployment form.
+Milestone 2 complete! Users can now submit deployment forms and view their deployments.
+Database is properly secured with RLS.
+Starting M3: GitHub integration to create repos from templates.
 
 ## Last Updated
 
