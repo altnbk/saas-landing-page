@@ -16,6 +16,9 @@ importers:
       '@astrojs/node':
         specifier: ^8.3.4
         version: 8.3.4(astro@4.16.19(@types/node@22.19.7)(rollup@4.56.0)(typescript@5.9.3))
+      '@saas-landing-page/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@supabase/supabase-js':
         specifier: ^2.45.4
         version: 2.91.0
@@ -29,6 +32,8 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.7
+
+  packages/types: {}
 
 packages:
 

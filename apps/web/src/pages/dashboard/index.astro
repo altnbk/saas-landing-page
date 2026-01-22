@@ -1,12 +1,15 @@
 ---
 import DashboardLayout from '../../layouts/DashboardLayout.astro';
 import { getSupabaseClient } from '../../lib/supabase';
+import type { Deployment } from '@saas-landing-page/types';
 
-// Get the user's email from session
+// Get the user's session
 const accessToken = Astro.cookies.get('sb-access-token')?.value;
 const refreshToken = Astro.cookies.get('sb-refresh-token')?.value;
 
 let userEmail = '';
+let userId = '';
+let deployments: Deployment[] = [];
 
 if (accessToken && refreshToken) {
   const supabase = getSupabaseClient();
@@ -15,6 +18,45 @@ if (accessToken && refreshToken) {
     refresh_token: refreshToken,
   });
   userEmail = data.session?.user?.email || '';
+  userId = data.session?.user?.id || '';
+
+  // Fetch user's deployments
+  if (userId) {
+    const { data: deploymentsData, error } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (!error && deploymentsData) {
+      deployments = deploymentsData as Deployment[];
+    }
+  }
+}
+
+// Helper function to format date
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// Helper function to get status badge color
+function getStatusColor(status: string) {
+  const colors: Record<string, string> = {
+    queued: '#6b7280',
+    creating_repo: '#3b82f6',
+    creating_pages: '#3b82f6',
+    deploying: '#f59e0b',
+    live: '#10b981',
+    failed: '#ef4444'
+  };
+  return colors[status] || '#6b7280';
 }
 ---
 
@@ -26,36 +68,97 @@ if (accessToken && refreshToken) {
     </div>
 
     <div class="content-grid">
-      <div class="card">
+      <!-- Create New Landing Page Form -->
+      <div class="card form-card">
         <h2>Create New Landing Page</h2>
-        <p>Fill out the form below to deploy a new landing page for your client.</p>
-        <p style="color: #6b7280; margin-top: 12px;">Coming in Milestone 2!</p>
+        <p class="card-description">Fill out the form below to deploy a new landing page.</p>
+
+        <form id="deployment-form">
+          <div class="form-group">
+            <label for="organization_name">Organization/Individual Name</label>
+            <input
+              type="text"
+              id="organization_name"
+              name="organization_name"
+              placeholder="Acme Corp"
+              required
+              maxlength="100"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="signer_name">Signer Name</label>
+            <input
+              type="text"
+              id="signer_name"
+              name="signer_name"
+              placeholder="John Doe"
+              required
+              maxlength="100"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="signer_email">Signer Email</label>
+            <input
+              type="email"
+              id="signer_email"
+              name="signer_email"
+              placeholder="john@example.com"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn" id="submit-btn">
+            Create Landing Page
+          </button>
+
+          <div id="form-message" class="form-message"></div>
+        </form>
       </div>
 
-      <div class="card">
+      <!-- Recent Deployments -->
+      <div class="card deployments-card">
         <h2>Your Deployments</h2>
-        <p>View and manage all your deployed landing pages.</p>
-        <p style="color: #6b7280; margin-top: 12px;">No deployments yet.</p>
-      </div>
-    </div>
+        <p class="card-description">View and manage your deployed landing pages.</p>
 
-    <div class="info-card card">
-      <h3>Milestone 1 Complete! ✓</h3>
-      <ul>
-        <li>✓ Astro app with server-side rendering</li>
-        <li>✓ Supabase magic link authentication</li>
-        <li>✓ Protected dashboard routes</li>
-        <li>✓ Dashboard layout and navigation</li>
-      </ul>
-      <p style="margin-top: 16px; color: #6b7280;">
-        Next up: Database schema, RLS policies, and deployment form (M2)
-      </p>
+        <div class="deployments-list">
+          {deployments.length === 0 ? (
+            <p class="no-deployments">No deployments yet. Create your first one!</p>
+          ) : (
+            deployments.slice(0, 5).map((deployment) => (
+              <a href={`/dashboard/deployments/${deployment.id}`} class="deployment-item">
+                <div class="deployment-info">
+                  <div class="deployment-name">{deployment.organization_name}</div>
+                  <div class="deployment-meta">
+                    {formatDate(deployment.created_at)}
+                  </div>
+                </div>
+                <div class="deployment-status">
+                  <span
+                    class="status-badge"
+                    style={`background: ${getStatusColor(deployment.status)}20; color: ${getStatusColor(deployment.status)};`}
+                  >
+                    {deployment.status}
+                  </span>
+                </div>
+              </a>
+            ))
+          )}
+        </div>
+
+        {deployments.length > 5 && (
+          <a href="/dashboard/deployments" class="view-all-link">
+            View all deployments →
+          </a>
+        )}
+      </div>
     </div>
   </div>
 
   <style>
     .dashboard-home {
-      max-width: 900px;
+      max-width: 1200px;
       margin: 0 auto;
     }
 
@@ -74,40 +177,189 @@ if (accessToken && refreshToken) {
 
     .content-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 24px;
       margin-bottom: 24px;
     }
 
+    @media (max-width: 968px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .card h2 {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #111827;
       font-size: 20px;
     }
 
-    .card h3 {
-      margin-bottom: 16px;
-      color: #111827;
-    }
-
-    .card p {
+    .card-description {
       color: #6b7280;
-      line-height: 1.5;
+      font-size: 14px;
+      margin-bottom: 24px;
     }
 
-    .info-card {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
+    .form-card form {
+      margin-top: 20px;
     }
 
-    .info-card ul {
-      list-style: none;
-      padding: 0;
+    .form-message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      display: none;
+      font-size: 14px;
     }
 
-    .info-card li {
-      padding: 8px 0;
-      color: #0369a1;
+    .form-message.show {
+      display: block;
+    }
+
+    .form-message.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #10b981;
+    }
+
+    .form-message.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #dc2626;
+    }
+
+    .deployments-list {
+      margin-top: 20px;
+    }
+
+    .no-deployments {
+      color: #9ca3af;
+      text-align: center;
+      padding: 40px 20px;
+      font-style: italic;
+    }
+
+    .deployment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.2s;
+    }
+
+    .deployment-item:hover {
+      background: #f9fafb;
+    }
+
+    .deployment-item:last-child {
+      border-bottom: none;
+    }
+
+    .deployment-info {
+      flex: 1;
+    }
+
+    .deployment-name {
+      font-weight: 500;
+      color: #111827;
+      margin-bottom: 4px;
+    }
+
+    .deployment-meta {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .deployment-status {
+      margin-left: 16px;
+    }
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .view-all-link {
+      display: block;
+      text-align: center;
+      padding: 12px;
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 8px;
+    }
+
+    .view-all-link:hover {
+      background: #f9fafb;
     }
   </style>
+
+  <script>
+    import { getSupabaseClient } from '../../lib/supabase';
+    import type { DeploymentFormData } from '@saas-landing-page/types';
+
+    const form = document.getElementById('deployment-form') as HTMLFormElement;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const messageDiv = document.getElementById('form-message') as HTMLDivElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+      const data: DeploymentFormData = {
+        organization_name: formData.get('organization_name') as string,
+        signer_name: formData.get('signer_name') as string,
+        signer_email: formData.get('signer_email') as string,
+      };
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating...';
+      messageDiv.className = 'form-message';
+      messageDiv.textContent = '';
+
+      try {
+        const supabase = getSupabaseClient();
+
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        // Create deployment record
+        const { data: deployment, error } = await supabase
+          .from('deployments')
+          .insert({
+            user_id: user.id,
+            organization_name: data.organization_name,
+            signer_name: data.signer_name,
+            signer_email: data.signer_email,
+            status: 'queued'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        messageDiv.className = 'form-message show success';
+        messageDiv.textContent = 'Deployment created successfully! Redirecting...';
+        form.reset();
+
+        // Redirect to deployment detail page after 1.5 seconds
+        setTimeout(() => {
+          window.location.href = `/dashboard/deployments/${deployment.id}`;
+        }, 1500);
+      } catch (error: any) {
+        messageDiv.className = 'form-message show error';
+        messageDiv.textContent = error.message || 'Failed to create deployment. Please try again.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Landing Page';
+      }
+    });
+  </script>
 </DashboardLayout>
