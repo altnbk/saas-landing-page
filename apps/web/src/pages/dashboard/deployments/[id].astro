@@ -1,0 +1,512 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { getSupabaseClient } from '../../../lib/supabase';
+import type { Deployment, DeploymentLog } from '@saas-landing-page/types';
+
+const { id } = Astro.params;
+
+// Get the user's session
+const accessToken = Astro.cookies.get('sb-access-token')?.value;
+const refreshToken = Astro.cookies.get('sb-refresh-token')?.value;
+
+let deployment: Deployment | null = null;
+let logs: DeploymentLog[] = [];
+let userId = '';
+
+if (accessToken && refreshToken && id) {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  userId = data.session?.user?.id || '';
+
+  if (userId) {
+    // Fetch deployment
+    const { data: deploymentData, error: deploymentError } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!deploymentError && deploymentData) {
+      deployment = deploymentData as Deployment;
+
+      // Fetch logs for this deployment
+      const { data: logsData, error: logsError } = await supabase
+        .from('deployment_logs')
+        .select('*')
+        .eq('deployment_id', id)
+        .order('created_at', { ascending: true });
+
+      if (!logsError && logsData) {
+        logs = logsData as DeploymentLog[];
+      }
+    }
+  }
+}
+
+// If deployment not found, redirect to dashboard
+if (!deployment) {
+  return Astro.redirect('/dashboard');
+}
+
+// Helper function to format date
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+// Helper function to get status badge color
+function getStatusColor(status: string) {
+  const colors: Record<string, string> = {
+    queued: '#6b7280',
+    creating_repo: '#3b82f6',
+    creating_pages: '#3b82f6',
+    deploying: '#f59e0b',
+    live: '#10b981',
+    failed: '#ef4444'
+  };
+  return colors[status] || '#6b7280';
+}
+
+// Helper function to get log level color
+function getLogLevelColor(level: string) {
+  const colors: Record<string, string> = {
+    info: '#3b82f6',
+    warning: '#f59e0b',
+    error: '#ef4444'
+  };
+  return colors[level] || '#6b7280';
+}
+---
+
+<DashboardLayout title={`Deployment: ${deployment.organization_name}`}>
+  <div class="deployment-detail">
+    <div class="breadcrumb">
+      <a href="/dashboard">Dashboard</a>
+      <span class="separator">›</span>
+      <span>Deployment</span>
+    </div>
+
+    <div class="deployment-header">
+      <div>
+        <h1>{deployment.organization_name}</h1>
+        <p class="deployment-id">ID: {deployment.id}</p>
+      </div>
+      <div class="status-container">
+        <span
+          class="status-badge"
+          style={`background: ${getStatusColor(deployment.status)}20; color: ${getStatusColor(deployment.status)};`}
+        >
+          {deployment.status}
+        </span>
+        {deployment.status !== 'live' && deployment.status !== 'failed' && (
+          <span class="auto-refresh-indicator" id="auto-refresh-indicator">
+            <span class="pulse"></span>
+            Auto-refreshing
+          </span>
+        )}
+      </div>
+    </div>
+
+    <div class="cards-grid">
+      <!-- Deployment Info Card -->
+      <div class="card">
+        <h2>Deployment Information</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Organization/Individual</div>
+            <div class="info-value">{deployment.organization_name}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Signer Name</div>
+            <div class="info-value">{deployment.signer_name}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Signer Email</div>
+            <div class="info-value">{deployment.signer_email}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Created At</div>
+            <div class="info-value">{formatDate(deployment.created_at)}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Last Updated</div>
+            <div class="info-value">{formatDate(deployment.updated_at)}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Status</div>
+            <div class="info-value" style="text-transform: capitalize;">{deployment.status}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Links Card -->
+      <div class="card">
+        <h2>Links</h2>
+        <div class="links-list">
+          {deployment.github_repo_url ? (
+            <div class="link-item">
+              <span class="link-label">GitHub Repository:</span>
+              <a href={deployment.github_repo_url} target="_blank" rel="noopener noreferrer" class="link-value">
+                {deployment.github_repo_url}
+              </a>
+            </div>
+          ) : (
+            <p class="no-links">GitHub repository will appear here once created.</p>
+          )}
+
+          {deployment.pages_url ? (
+            <div class="link-item">
+              <span class="link-label">Live Page:</span>
+              <a href={deployment.pages_url} target="_blank" rel="noopener noreferrer" class="link-value">
+                {deployment.pages_url}
+              </a>
+            </div>
+          ) : (
+            <p class="no-links">Live page URL will appear here once deployed.</p>
+          )}
+
+          {deployment.error_message && (
+            <div class="error-box">
+              <strong>Error:</strong> {deployment.error_message}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Card -->
+    <div class="card logs-card">
+      <h2>Deployment Logs</h2>
+      <div class="logs-container">
+        {logs.length === 0 ? (
+          <p class="no-logs">No logs available yet. Logs will appear once the deployment process starts.</p>
+        ) : (
+          logs.map((log) => (
+            <div class="log-entry">
+              <span
+                class="log-level"
+                style={`color: ${getLogLevelColor(log.level)};`}
+              >
+                [{log.level.toUpperCase()}]
+              </span>
+              <span class="log-time">{formatDate(log.created_at)}</span>
+              <span class="log-message">{log.message}</span>
+            </div>
+          ))
+        )}
+      </div>
+      {deployment.status !== 'live' && deployment.status !== 'failed' && (
+        <button id="refresh-btn" class="btn btn-secondary" style="margin-top: 16px;">
+          Refresh Status
+        </button>
+      )}
+    </div>
+  </div>
+
+  <style>
+    .deployment-detail {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .breadcrumb {
+      margin-bottom: 24px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .breadcrumb a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .separator {
+      margin: 0 8px;
+    }
+
+    .deployment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 32px;
+    }
+
+    .deployment-header h1 {
+      margin-bottom: 8px;
+      color: #111827;
+    }
+
+    .deployment-id {
+      color: #6b7280;
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-badge {
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .auto-refresh-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: #3b82f6;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+      }
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 968px) {
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card h2 {
+      margin-bottom: 20px;
+      color: #111827;
+      font-size: 18px;
+    }
+
+    .info-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .info-item {
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+
+    .info-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .info-label {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      color: #111827;
+      font-weight: 500;
+    }
+
+    .links-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .link-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .link-label {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .link-value {
+      color: #3b82f6;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .link-value:hover {
+      text-decoration: underline;
+    }
+
+    .no-links {
+      color: #9ca3af;
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    .error-box {
+      padding: 12px;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      color: #991b1b;
+      font-size: 14px;
+    }
+
+    .logs-card {
+      margin-top: 24px;
+    }
+
+    .logs-container {
+      background: #1f2937;
+      color: #f9fafb;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 13px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid #374151;
+      display: grid;
+      grid-template-columns: 80px 180px 1fr;
+      gap: 12px;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-level {
+      font-weight: 600;
+    }
+
+    .log-time {
+      color: #9ca3af;
+      font-size: 12px;
+    }
+
+    .log-message {
+      word-break: break-word;
+    }
+
+    .no-logs {
+      color: #9ca3af;
+      text-align: center;
+      padding: 40px 20px;
+      font-style: italic;
+    }
+
+    @media (max-width: 768px) {
+      .deployment-header {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .log-entry {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+    }
+  </style>
+
+  <script define:vars={{ deploymentId: id, initialStatus: deployment?.status }}>
+    // Auto-refresh functionality for deployment status
+    let pollInterval;
+    let pollCount = 0;
+    const MAX_POLLS = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
+
+    // Only poll if deployment is in a non-final state
+    const shouldPoll = initialStatus !== 'live' && initialStatus !== 'failed';
+
+    async function checkDeploymentStatus() {
+      try {
+        const response = await fetch(`/api/deployments/${deploymentId}/status`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch status');
+        }
+
+        const data = await response.json();
+
+        // If status changed to a final state, reload the page
+        if (data.status === 'live' || data.status === 'failed') {
+          clearInterval(pollInterval);
+          window.location.reload();
+        }
+
+        pollCount++;
+
+        // Stop polling after MAX_POLLS attempts
+        if (pollCount >= MAX_POLLS) {
+          clearInterval(pollInterval);
+          console.log('Stopped polling after max attempts');
+        }
+      } catch (error) {
+        console.error('Error checking deployment status:', error);
+        // Don't stop polling on error, just log it
+      }
+    }
+
+    // Start polling if needed
+    if (shouldPoll) {
+      // Initial check after 5 seconds
+      setTimeout(() => {
+        checkDeploymentStatus();
+
+        // Then poll every 5 seconds
+        pollInterval = setInterval(checkDeploymentStatus, 5000);
+      }, 5000);
+
+      // Clean up on page unload
+      window.addEventListener('beforeunload', () => {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+        }
+      });
+    }
+  </script>
+</DashboardLayout>

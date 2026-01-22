@@ -1,0 +1,139 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// If user is already logged in, redirect to dashboard
+const accessToken = Astro.cookies.get('sb-access-token')?.value;
+if (accessToken) {
+  return Astro.redirect('/dashboard');
+}
+---
+
+<BaseLayout title="Login - Landing Page Generator">
+  <div class="login-page">
+    <div class="login-container">
+      <div class="card">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Sign in to your account with a magic link</p>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn" id="submit-btn">
+            Send Magic Link
+          </button>
+
+          <div id="message" class="message"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      color: #111827;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      margin-bottom: 32px;
+    }
+
+    .btn {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .message.show {
+      display: block;
+    }
+
+    .message.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #10b981;
+    }
+
+    .message.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #dc2626;
+    }
+
+    .message.info {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #3b82f6;
+    }
+  </style>
+
+  <script>
+    import { getSupabaseClient } from '../lib/supabase';
+
+    const form = document.getElementById('login-form') as HTMLFormElement;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const messageDiv = document.getElementById('message') as HTMLDivElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = (document.getElementById('email') as HTMLInputElement).value;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+      messageDiv.className = 'message';
+      messageDiv.textContent = '';
+
+      try {
+        const supabase = getSupabaseClient();
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+
+        if (error) throw error;
+
+        messageDiv.className = 'message show success';
+        messageDiv.textContent = 'Check your email for the magic link!';
+        form.reset();
+      } catch (error: any) {
+        messageDiv.className = 'message show error';
+        messageDiv.textContent = error.message || 'Failed to send magic link. Please try again.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Magic Link';
+      }
+    });
+  </script>
+</BaseLayout>

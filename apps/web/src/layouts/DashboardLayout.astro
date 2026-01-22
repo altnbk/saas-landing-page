@@ -1,0 +1,83 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<BaseLayout title={title}>
+  <div class="dashboard">
+    <header class="dashboard-header">
+      <div class="container">
+        <nav>
+          <div class="nav-brand">
+            <a href="/dashboard">Landing Page Generator</a>
+          </div>
+          <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <form action="/api/auth/logout" method="POST" style="display: inline;">
+              <button type="submit" class="btn btn-secondary" style="padding: 8px 16px;">Logout</button>
+            </form>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="dashboard-content">
+      <div class="container">
+        <slot />
+      </div>
+    </main>
+  </div>
+
+  <style>
+    .dashboard {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dashboard-header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 16px 0;
+    }
+
+    .dashboard-header nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-brand a {
+      font-size: 20px;
+      font-weight: 600;
+      color: #111827;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: #6b7280;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: #111827;
+    }
+
+    .dashboard-content {
+      flex: 1;
+      padding: 40px 0;
+    }
+  </style>
+</BaseLayout>
