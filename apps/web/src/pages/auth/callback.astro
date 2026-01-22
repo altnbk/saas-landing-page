@@ -1,0 +1,114 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Authenticating...">
+  <div class="callback-page">
+    <div class="callback-container">
+      <div class="card">
+        <h1>Authenticating...</h1>
+        <p>Please wait while we sign you in.</p>
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .callback-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .callback-container {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      color: #111827;
+    }
+
+    p {
+      color: #6b7280;
+      margin-bottom: 32px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error-message {
+      color: #dc2626;
+      margin-top: 20px;
+    }
+  </style>
+
+  <script>
+    import { getSupabaseClient } from '../../lib/supabase';
+
+    async function handleCallback() {
+      try {
+        const supabase = getSupabaseClient();
+
+        // Get the code from URL hash or query params
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
+
+        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+        const type = hashParams.get('type') || queryParams.get('type');
+
+        if (type === 'magiclink' && accessToken) {
+          // Set the session
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+
+          if (error) throw error;
+
+          // Store tokens in cookies for SSR
+          if (data.session) {
+            document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+            document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+          }
+
+          // Redirect to dashboard
+          window.location.href = '/dashboard';
+        } else {
+          throw new Error('Invalid authentication callback');
+        }
+      } catch (error: any) {
+        console.error('Auth callback error:', error);
+        const container = document.querySelector('.callback-container');
+        if (container) {
+          container.innerHTML = `
+            <div class="card">
+              <h1>Authentication Failed</h1>
+              <p class="error-message">${error.message || 'Something went wrong'}</p>
+              <a href="/login" class="btn">Back to Login</a>
+            </div>
+          `;
+        }
+      }
+    }
+
+    handleCallback();
+  </script>
+</BaseLayout>
