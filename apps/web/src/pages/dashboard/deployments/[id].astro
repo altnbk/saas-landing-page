@@ -102,13 +102,19 @@ function getLogLevelColor(level: string) {
         <h1>{deployment.organization_name}</h1>
         <p class="deployment-id">ID: {deployment.id}</p>
       </div>
-      <div>
+      <div class="status-container">
         <span
           class="status-badge"
           style={`background: ${getStatusColor(deployment.status)}20; color: ${getStatusColor(deployment.status)};`}
         >
           {deployment.status}
         </span>
+        {deployment.status !== 'live' && deployment.status !== 'failed' && (
+          <span class="auto-refresh-indicator" id="auto-refresh-indicator">
+            <span class="pulse"></span>
+            Auto-refreshing
+          </span>
+        )}
       </div>
     </div>
 
@@ -251,12 +257,45 @@ function getLogLevelColor(level: string) {
       font-family: monospace;
     }
 
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .status-badge {
       padding: 8px 16px;
       border-radius: 12px;
       font-size: 14px;
       font-weight: 500;
       text-transform: capitalize;
+    }
+
+    .auto-refresh-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: #3b82f6;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+      }
     }
 
     .cards-grid {
@@ -406,11 +445,67 @@ function getLogLevelColor(level: string) {
     }
   </style>
 
-  <script>
+  <script define:vars={{ deploymentId: id, initialStatus: deployment?.status }}>
+    // Auto-refresh functionality for deployment status
+    let pollInterval;
+    let pollCount = 0;
+    const MAX_POLLS = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+
     const refreshBtn = document.getElementById('refresh-btn');
+
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
         window.location.reload();
+      });
+    }
+
+    // Only poll if deployment is in a non-final state
+    const shouldPoll = initialStatus !== 'live' && initialStatus !== 'failed';
+
+    async function checkDeploymentStatus() {
+      try {
+        const response = await fetch(`/api/deployments/${deploymentId}/status`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch status');
+        }
+
+        const data = await response.json();
+
+        // If status changed to a final state, reload the page
+        if (data.status === 'live' || data.status === 'failed') {
+          clearInterval(pollInterval);
+          window.location.reload();
+        }
+
+        pollCount++;
+
+        // Stop polling after MAX_POLLS attempts
+        if (pollCount >= MAX_POLLS) {
+          clearInterval(pollInterval);
+          console.log('Stopped polling after max attempts');
+        }
+      } catch (error) {
+        console.error('Error checking deployment status:', error);
+        // Don't stop polling on error, just log it
+      }
+    }
+
+    // Start polling if needed
+    if (shouldPoll) {
+      // Initial check after 5 seconds
+      setTimeout(() => {
+        checkDeploymentStatus();
+
+        // Then poll every 5 seconds
+        pollInterval = setInterval(checkDeploymentStatus, 5000);
+      }, 5000);
+
+      // Clean up on page unload
+      window.addEventListener('beforeunload', () => {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+        }
       });
     }
   </script>

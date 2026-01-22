@@ -1,6 +1,6 @@
 # Project Status
 
-## Current Milestone: M4 - Cloudflare Pages Integration
+## Current Milestone: M5 - Background Worker + Status Polling
 
 ## Completed
 
@@ -37,20 +37,28 @@
 - [x] Updated dashboard to auto-trigger GitHub creation
 - [x] Added error handling and logging
 
+### Milestone 4: Cloudflare Pages Integration (✓)
+- [x] Created Cloudflare API service
+- [x] Implemented Pages project creation
+- [x] Added deployment status checking
+- [x] Updated GitHub trigger to create Pages projects
+- [x] Implemented automatic deployment monitoring
+- [x] Created status API endpoint
+- [x] Added error handling for Cloudflare operations
+
 ## In Progress
 
-- [ ] M4: Cloudflare Pages Integration
+- [ ] M5: Background Worker + Status Polling
 
 ## Todo
 
-- [ ] M5: Background Worker + Status Polling
 - [ ] M6: Email Notifications
 
 ## Notes
 
-Milestone 3 complete! System now creates GitHub repositories with rendered landing pages.
-All user inputs are HTML-escaped to prevent XSS.
-Starting M4: Cloudflare Pages integration for automatic deployments.
+Milestone 4 complete! Landing pages now deploy automatically to Cloudflare Pages.
+System creates GitHub repos, sets up Pages projects, and monitors deployment status.
+Starting M5: Add UI polling and improve deployment workflow.
 
 ## Last Updated
 
