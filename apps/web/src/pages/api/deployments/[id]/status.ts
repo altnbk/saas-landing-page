@@ -6,6 +6,7 @@
 import type { APIRoute } from 'astro';
 import { getSupabaseClient, getSupabaseAdmin } from '../../../../lib/supabase';
 import { getDeploymentStatus } from '../../../../lib/cloudflare';
+import { sendDeploymentSuccessEmail, sendDeploymentFailedEmail } from '../../../../lib/email';
 
 export const GET: APIRoute = async ({ params, cookies }) => {
   const { id } = params;
@@ -61,6 +62,15 @@ export const GET: APIRoute = async ({ params, cookies }) => {
       });
     }
 
+    // Fetch user profile for email
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('id', userId)
+      .single();
+
+    const userEmail = profile?.email || '';
+
     // If deployment is already in a final state, just return current status
     if (deployment.status === 'live' || deployment.status === 'failed') {
       return new Response(
@@ -107,6 +117,17 @@ export const GET: APIRoute = async ({ params, cookies }) => {
               message: 'Deployment completed successfully!',
             });
 
+            // Send success email
+            if (userEmail && deployment.pages_url && deployment.github_repo_url) {
+              await sendDeploymentSuccessEmail(
+                userEmail,
+                deployment.organization_name,
+                id,
+                deployment.pages_url,
+                deployment.github_repo_url
+              );
+            }
+
             return new Response(
               JSON.stringify({
                 status: 'live',
@@ -136,6 +157,16 @@ export const GET: APIRoute = async ({ params, cookies }) => {
               level: 'error',
               message: 'Deployment failed on Cloudflare Pages',
             });
+
+            // Send failure email
+            if (userEmail) {
+              await sendDeploymentFailedEmail(
+                userEmail,
+                deployment.organization_name,
+                id,
+                'Cloudflare deployment failed'
+              );
+            }
 
             return new Response(
               JSON.stringify({

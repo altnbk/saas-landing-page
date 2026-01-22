@@ -46,19 +46,27 @@
 - [x] Created status API endpoint
 - [x] Added error handling for Cloudflare operations
 
+### Milestone 5: Status Polling + Real-time Updates (✓)
+- [x] Implemented automatic status polling (5-second intervals)
+- [x] Added client-side auto-refresh logic
+- [x] Created visual polling indicator with pulsing animation
+- [x] Implemented max polling attempts (300 seconds)
+- [x] Added automatic page reload on final status
+- [x] Implemented cleanup on page navigation
+
 ## In Progress
-
-- [ ] M5: Background Worker + Status Polling
-
-## Todo
 
 - [ ] M6: Email Notifications
 
+## Todo
+
+None - Final milestone in progress!
+
 ## Notes
 
-Milestone 4 complete! Landing pages now deploy automatically to Cloudflare Pages.
-System creates GitHub repos, sets up Pages projects, and monitors deployment status.
-Starting M5: Add UI polling and improve deployment workflow.
+Milestone 5 complete! Deployment detail page now shows real-time status updates.
+Users see progress automatically without manual refresh.
+Starting M6: Add email notifications for deployment events.
 
 ## Last Updated
 

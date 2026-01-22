@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseClient, getSupabaseAdmin } from '../../../../lib/supabase';
 import { createLandingPageRepo } from '../../../../lib/github';
 import { createPagesProject, getLatestDeployment } from '../../../../lib/cloudflare';
+import { sendDeploymentStartedEmail, sendDeploymentSuccessEmail, sendDeploymentFailedEmail } from '../../../../lib/email';
 
 export const POST: APIRoute = async ({ params, cookies, request }) => {
   const { id } = params;
@@ -61,6 +62,15 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
       });
     }
 
+    // Fetch user profile for email
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('id', userId)
+      .single();
+
+    const userEmail = profile?.email || '';
+
     // Check if already processed
     if (deployment.status !== 'queued') {
       return new Response(
@@ -101,6 +111,16 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
         message: `GitHub repository created: ${repoResult.repoName}`,
         metadata: { repo_url: repoResult.htmlUrl },
       });
+
+      // Send deployment started email
+      if (userEmail) {
+        await sendDeploymentStartedEmail(
+          userEmail,
+          deployment.organization_name,
+          id,
+          repoResult.htmlUrl
+        );
+      }
 
       // Update deployment with GitHub info
       await supabaseAdmin
@@ -186,6 +206,17 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
               level: 'info',
               message: 'Deployment completed successfully!',
             });
+
+            // Send success email
+            if (userEmail) {
+              await sendDeploymentSuccessEmail(
+                userEmail,
+                deployment.organization_name,
+                id,
+                pagesUrl,
+                repoResult.htmlUrl
+              );
+            }
           }
         }
 
@@ -206,6 +237,16 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', id);
+
+        // Send failure email
+        if (userEmail) {
+          await sendDeploymentFailedEmail(
+            userEmail,
+            deployment.organization_name,
+            id,
+            `Cloudflare error: ${cfError.message}`
+          );
+        }
 
         return new Response(
           JSON.stringify({
@@ -249,6 +290,16 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
+
+      // Send failure email
+      if (userEmail) {
+        await sendDeploymentFailedEmail(
+          userEmail,
+          deployment.organization_name,
+          id,
+          `GitHub error: ${error.message}`
+        );
+      }
 
       return new Response(
         JSON.stringify({ error: 'Failed to create GitHub repository', details: error.message }),

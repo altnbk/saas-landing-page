@@ -17,6 +17,7 @@
     "@saas-landing-page/types": "workspace:*",
     "@supabase/supabase-js": "^2.45.4",
     "astro": "^4.16.17",
+    "resend": "^4.0.1",
     "typescript": "^5.7.2"
   },
   "devDependencies": {
