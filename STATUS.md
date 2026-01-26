@@ -1,6 +1,6 @@
 # Project Status
 
-## Current Status: ✅ ALL MILESTONES COMPLETE!
+## Current Status: ✅ MVP COMPLETE (with documented limitations)
 
 ## Completed
 
@@ -81,11 +81,49 @@ Security features implemented:
 - XSS protection via HTML escaping
 - Environment variables for all secrets
 
-Next steps:
-1. Set up your environment variables (.env)
-2. Run Supabase migrations
-3. Configure GitHub, Cloudflare, and Resend accounts
-4. Test the complete deployment flow
+## Critical Fixes Applied (Latest Commit)
+
+After end-to-end testing revealed issues, the following fixes were applied:
+
+1. **Cloudflare Pages GitHub Authorization** (CRITICAL)
+   - Issue: Pages projects created without GitHub connection
+   - Fix: Added fallback logic + prominent setup documentation
+   - Requirement: Users must authorize GitHub in Cloudflare UI first
+   - See: SETUP_GUIDE.md Step 2 and KNOWN_ISSUES.md
+
+2. **Email Failures Now Non-Blocking**
+   - Issue: Resend errors broke entire deployment pipeline
+   - Fix: All email calls wrapped in try-catch blocks
+   - Impact: Deployments succeed even if email fails
+
+3. **URL Generation Bug Fixed**
+   - Issue: Double `.pages.dev` suffix (e.g., example.pages.dev.pages.dev)
+   - Fix: Strip suffix from subdomain before concatenating
+   - Impact: Clean URLs generated correctly
+
+4. **Documentation Enhanced**
+   - Added KNOWN_ISSUES.md documenting all limitations
+   - Updated SETUP_GUIDE.md with critical GitHub auth step
+   - Enhanced troubleshooting section
+
+## Known Limitations
+
+See **KNOWN_ISSUES.md** for complete details. Key limitations:
+
+- **Cloudflare requires manual GitHub authorization** (one-time, before first use)
+- **Status polling uses internal flags**, not live Cloudflare build status
+- **No automated tests** (manual testing only)
+- **No rate limiting or usage quotas**
+- **Single template** (no customization options)
+
+## Next Steps for Users
+
+1. **CRITICAL**: Authorize GitHub in Cloudflare Dashboard (see SETUP_GUIDE.md Step 2)
+2. Set up your environment variables (.env)
+3. Run Supabase migrations
+4. Configure GitHub, Cloudflare, and Resend accounts
+5. Test the complete deployment flow
+6. Review KNOWN_ISSUES.md for limitations
 
 ## Last Updated
 
