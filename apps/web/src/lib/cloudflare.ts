@@ -104,6 +104,14 @@ async function cfRequest<T>(
 
 /**
  * Create a new Pages project connected to a GitHub repository
+ *
+ * IMPORTANT: Before this works, you must authorize GitHub in Cloudflare:
+ * 1. Go to Cloudflare Dashboard → Workers & Pages
+ * 2. Create a project (any method)
+ * 3. Connect to GitHub when prompted
+ * 4. Complete the GitHub authorization flow
+ *
+ * After that, API-created projects will be able to connect to GitHub repos.
  */
 export async function createPagesProject(
   params: CreatePagesProjectParams
@@ -112,7 +120,9 @@ export async function createPagesProject(
     // Cloudflare Pages project names must be lowercase alphanumeric with hyphens
     const projectName = params.projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-    const body = {
+    // First, try to create project with GitHub source
+    // This will only work if GitHub is authorized in Cloudflare
+    let body: any = {
       name: projectName,
       production_branch: 'main',
       source: {
@@ -137,15 +147,51 @@ export async function createPagesProject(
       },
     };
 
-    const response = await cfRequest<PagesProject>(
-      `/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }
-    );
+    try {
+      const response = await cfRequest<PagesProject>(
+        `/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }
+      );
 
-    return response.result;
+      return response.result;
+    } catch (githubError: any) {
+      // If GitHub integration fails, fall back to creating without source
+      // User will need to manually connect in Cloudflare UI
+      console.warn('Failed to create with GitHub source, creating without source:', githubError.message);
+
+      // Create without source as fallback
+      const bodyWithoutSource = {
+        name: projectName,
+        production_branch: 'main',
+        build_config: {
+          build_command: '',
+          destination_dir: '/',
+          root_dir: '/',
+        },
+        deployment_configs: {
+          production: {
+            compatibility_date: '2024-01-01',
+          },
+        },
+      };
+
+      const fallbackResponse = await cfRequest<PagesProject>(
+        `/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects`,
+        {
+          method: 'POST',
+          body: JSON.stringify(bodyWithoutSource),
+        }
+      );
+
+      // Add a note in the error that manual connection is needed
+      const result = fallbackResponse.result;
+      console.warn(`Pages project '${result.name}' created without GitHub connection. Manual connection required in Cloudflare UI.`);
+
+      return result;
+    }
   } catch (error: any) {
     console.error('Cloudflare Pages creation error:', error);
     throw new Error(`Failed to create Pages project: ${error.message}`);

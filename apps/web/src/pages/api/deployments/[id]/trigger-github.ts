@@ -112,14 +112,19 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
         metadata: { repo_url: repoResult.htmlUrl },
       });
 
-      // Send deployment started email
+      // Send deployment started email (non-blocking)
       if (userEmail) {
-        await sendDeploymentStartedEmail(
-          userEmail,
-          deployment.organization_name,
-          id,
-          repoResult.htmlUrl
-        );
+        try {
+          await sendDeploymentStartedEmail(
+            userEmail,
+            deployment.organization_name,
+            id,
+            repoResult.htmlUrl
+          );
+        } catch (emailError: any) {
+          console.error('Email notification failed (non-critical):', emailError.message);
+          // Don't fail the deployment if email fails
+        }
       }
 
       // Update deployment with GitHub info
@@ -149,7 +154,9 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
           repoOwner: import.meta.env.GITHUB_TEMPLATE_OWNER,
         });
 
-        pagesUrl = `https://${pagesProject.subdomain}.pages.dev`;
+        // Normalize subdomain - remove .pages.dev if already present
+        const subdomain = pagesProject.subdomain.replace(/\.pages\.dev$/, '');
+        pagesUrl = `https://${subdomain}.pages.dev`;
 
         // Log: Pages project created
         await supabaseAdmin.from('deployment_logs').insert({
@@ -207,15 +214,19 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
               message: 'Deployment completed successfully!',
             });
 
-            // Send success email
+            // Send success email (non-blocking)
             if (userEmail) {
-              await sendDeploymentSuccessEmail(
-                userEmail,
-                deployment.organization_name,
-                id,
-                pagesUrl,
-                repoResult.htmlUrl
-              );
+              try {
+                await sendDeploymentSuccessEmail(
+                  userEmail,
+                  deployment.organization_name,
+                  id,
+                  pagesUrl,
+                  repoResult.htmlUrl
+                );
+              } catch (emailError: any) {
+                console.error('Email notification failed (non-critical):', emailError.message);
+              }
             }
           }
         }
@@ -238,14 +249,18 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
           })
           .eq('id', id);
 
-        // Send failure email
+        // Send failure email (non-blocking)
         if (userEmail) {
-          await sendDeploymentFailedEmail(
-            userEmail,
-            deployment.organization_name,
-            id,
-            `Cloudflare error: ${cfError.message}`
-          );
+          try {
+            await sendDeploymentFailedEmail(
+              userEmail,
+              deployment.organization_name,
+              id,
+              `Cloudflare error: ${cfError.message}`
+            );
+          } catch (emailError: any) {
+            console.error('Email notification failed (non-critical):', emailError.message);
+          }
         }
 
         return new Response(
@@ -291,14 +306,18 @@ export const POST: APIRoute = async ({ params, cookies, request }) => {
         })
         .eq('id', id);
 
-      // Send failure email
+      // Send failure email (non-blocking)
       if (userEmail) {
-        await sendDeploymentFailedEmail(
-          userEmail,
-          deployment.organization_name,
-          id,
-          `GitHub error: ${error.message}`
-        );
+        try {
+          await sendDeploymentFailedEmail(
+            userEmail,
+            deployment.organization_name,
+            id,
+            `GitHub error: ${error.message}`
+          );
+        } catch (emailError: any) {
+          console.error('Email notification failed (non-critical):', emailError.message);
+        }
       }
 
       return new Response(

@@ -117,15 +117,19 @@ export const GET: APIRoute = async ({ params, cookies }) => {
               message: 'Deployment completed successfully!',
             });
 
-            // Send success email
+            // Send success email (non-blocking)
             if (userEmail && deployment.pages_url && deployment.github_repo_url) {
-              await sendDeploymentSuccessEmail(
-                userEmail,
-                deployment.organization_name,
-                id,
-                deployment.pages_url,
-                deployment.github_repo_url
-              );
+              try {
+                await sendDeploymentSuccessEmail(
+                  userEmail,
+                  deployment.organization_name,
+                  id,
+                  deployment.pages_url,
+                  deployment.github_repo_url
+                );
+              } catch (emailError: any) {
+                console.error('Email notification failed (non-critical):', emailError.message);
+              }
             }
 
             return new Response(
@@ -158,14 +162,18 @@ export const GET: APIRoute = async ({ params, cookies }) => {
               message: 'Deployment failed on Cloudflare Pages',
             });
 
-            // Send failure email
+            // Send failure email (non-blocking)
             if (userEmail) {
-              await sendDeploymentFailedEmail(
-                userEmail,
-                deployment.organization_name,
-                id,
-                'Cloudflare deployment failed'
-              );
+              try {
+                await sendDeploymentFailedEmail(
+                  userEmail,
+                  deployment.organization_name,
+                  id,
+                  'Cloudflare deployment failed'
+                );
+              } catch (emailError: any) {
+                console.error('Email notification failed (non-critical):', emailError.message);
+              }
             }
 
             return new Response(

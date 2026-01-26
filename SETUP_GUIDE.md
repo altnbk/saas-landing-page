@@ -45,7 +45,29 @@ You'll need accounts for:
 2. Create an API key
 3. Verify your sending domain (or use the test domain for development)
 
-### 2. Configure Environment Variables
+### 2. **CRITICAL: Authorize Cloudflare with GitHub**
+
+**This step is required before automatic deployments will work!**
+
+Before the app can create Pages projects connected to GitHub repositories, you must authorize Cloudflare to access your GitHub account:
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Navigate to **Workers & Pages**
+3. Click **Create Application** → **Pages** → **Connect to Git**
+4. Click **Connect GitHub**
+5. Complete the GitHub authorization flow
+6. You can cancel the project creation after authorization is complete
+
+**What happens if you skip this:**
+- Pages projects will be created without GitHub connection
+- No builds will be triggered automatically
+- URLs will return errors (DNS/522)
+- You'll need to manually connect repos in Cloudflare UI
+
+**Verification:**
+After authorization, you should see "GitHub connected" or similar in the Cloudflare Pages interface.
+
+### 3. Configure Environment Variables
 
 1. Copy `.env.example` to `.env`:
 ```bash
@@ -76,7 +98,7 @@ FROM_EMAIL=noreply@yourdomain.com
 PUBLIC_APP_URL=http://localhost:4321
 ```
 
-### 3. Set Up Database
+### 4. Set Up Database
 
 1. Go to your Supabase project dashboard
 2. Navigate to SQL Editor
@@ -86,13 +108,13 @@ PUBLIC_APP_URL=http://localhost:4321
 
 See `supabase/README.md` for detailed instructions.
 
-### 4. Install Dependencies
+### 5. Install Dependencies
 
 ```bash
 pnpm install
 ```
 
-### 5. Start Development Server
+### 6. Start Development Server
 
 ```bash
 pnpm dev
@@ -160,10 +182,30 @@ saas-landing-page/
 - Check that `GITHUB_TEMPLATE_OWNER` is correct
 - Ensure you have permission to create repos
 
-### Cloudflare Deployment Fails
+### Cloudflare Pages Shows "No Git Connection" or URLs Return Errors
+
+**This is the most common issue!**
+
+Symptoms:
+- Pages projects are created but show "No Git connection" in Cloudflare UI
+- `.pages.dev` URLs return DNS errors or Cloudflare 522 errors
+- No builds are triggered automatically
+
+**Solution:**
+1. You must authorize GitHub in Cloudflare BEFORE the app can work (see Step 2 above)
+2. Go to Cloudflare Dashboard → Workers & Pages → Create → Connect to Git
+3. Complete the GitHub authorization flow
+4. After authorization, try creating a new deployment in the app
+
+**If you already have deployments without connection:**
+- They won't automatically fix themselves
+- You can manually connect them in Cloudflare UI
+- Or create new deployments (which will work if GitHub is now authorized)
+
+### Cloudflare Deployment Fails (Other Issues)
 - Verify your API token has Pages Edit permissions
 - Check that `CLOUDFLARE_ACCOUNT_ID` is correct
-- Ensure the GitHub integration is authorized in Cloudflare
+- Check server logs for specific Cloudflare API errors
 
 ### Emails Not Sending
 - Verify `RESEND_API_KEY` is valid
